@@ -1,68 +1,75 @@
-# DTI_PROJECT
-Wait, how does this even work?
-Unlike what you might expect at this point, Stable Diffusion doesn't actually run on magic. It's a kind of "latent diffusion model". Let's dig into what that means.
+# TripoSR <a href="https://huggingface.co/stabilityai/TripoSR"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Model_Card-Huggingface-orange"></a> <a href="https://huggingface.co/spaces/stabilityai/TripoSR"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Gradio%20Demo-Huggingface-orange"></a> <a href="https://huggingface.co/papers/2403.02151"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Paper-Huggingface-orange"></a> <a href="https://arxiv.org/abs/2403.02151"><img src="https://img.shields.io/badge/Arxiv-2403.02151-B31B1B.svg"></a> <a href="https://discord.gg/mvS9mCfMnQ"><img src="https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white"></a>
 
-You may be familiar with the idea of super-resolution: it's possible to train a deep learning model to denoise an input image -- and thereby turn it into a higher-resolution version. The deep learning model doesn't do this by magically recovering the information that's missing from the noisy, low-resolution input -- rather, the model uses its training data distribution to hallucinate the visual details that would be most likely given the input. To learn more about super-resolution, you can check out the following Keras.io tutorials:
+<div align="center">
+  <img src="figures/teaser800.gif" alt="Teaser Video">
+</div>
 
-Image Super-Resolution using an Efficient Sub-Pixel CNN
-Enhanced Deep Residual Networks for single-image super-resolution
-Super-resolution
+This is the official codebase for **TripoSR**, a state-of-the-art open-source model for **fast** feedforward 3D reconstruction from a single image, collaboratively developed by [Tripo AI](https://www.tripo3d.ai/) and [Stability AI](https://stability.ai/).
+<br><br>
+Leveraging the principles of the [Large Reconstruction Model (LRM)](https://yiconghong.me/LRM/), TripoSR brings to the table key advancements that significantly boost both the speed and quality of 3D reconstruction. Our model is distinguished by its ability to rapidly process inputs, generating high-quality 3D models in less than 0.5 seconds on an NVIDIA A100 GPU. TripoSR has exhibited superior performance in both qualitative and quantitative evaluations, outperforming other open-source alternatives across multiple public datasets. The figures below illustrate visual comparisons and metrics showcasing TripoSR's performance relative to other leading models. Details about the model architecture, training process, and comparisons can be found in this [technical report](https://arxiv.org/abs/2403.02151).
 
-When you push this idea to the limit, you may start asking -- what if we just run such a model on pure noise? The model would then "denoise the noise" and start hallucinating a brand new image. By repeating the process multiple times, you can get turn a small patch of noise into an increasingly clear and high-resolution artificial picture.
+<!--
+<div align="center">
+  <img src="figures/comparison800.gif" alt="Teaser Video">
+</div>
+-->
+<p align="center">
+    <img width="800" src="figures/visual_comparisons.jpg"/>
+</p>
 
-This is the key idea of latent diffusion, proposed in High-Resolution Image Synthesis with Latent Diffusion Models in 2020. To understand diffusion in depth, you can check the Keras.io tutorial Denoising Diffusion Implicit Models.
+<p align="center">
+    <img width="450" src="figures/scatter-comparison.png"/>
+</p>
 
-Denoising diffusion
 
-Now, to go from latent diffusion to a text-to-image system, you still need to add one key feature: the ability to control the generated visual contents via prompt keywords. This is done via "conditioning", a classic deep learning technique which consists of concatenating to the noise patch a vector that represents a bit of text, then training the model on a dataset of {image: caption} pairs.
+The model is released under the MIT license, which includes the source code, pretrained models, and an interactive online demo. Our goal is to empower researchers, developers, and creatives to push the boundaries of what's possible in 3D generative AI and 3D content creation.
 
-This gives rise to the Stable Diffusion architecture. Stable Diffusion consists of three parts:
+## Getting Started
+### Installation
+- Python >= 3.8
+- Install CUDA if available
+- Install PyTorch according to your platform: [https://pytorch.org/get-started/locally/](https://pytorch.org/get-started/locally/) **[Please make sure that the locally-installed CUDA major version matches the PyTorch-shipped CUDA major version. For example if you have CUDA 11.x installed, make sure to install PyTorch compiled with CUDA 11.x.]**
+- Update setuptools by `pip install --upgrade setuptools`
+- Install other dependencies by `pip install -r requirements.txt`
 
-A text encoder, which turns your prompt into a latent vector.
-A diffusion model, which repeatedly "denoises" a 64x64 latent image patch.
-A decoder, which turns the final 64x64 latent patch into a higher-resolution 512x512 image.
-First, your text prompt gets projected into a latent vector space by the text encoder, which is simply a pretrained, frozen language model. Then that prompt vector is concatenated to a randomly generated noise patch, which is repeatedly "denoised" by the diffusion model over a series of "steps" (the more steps you run the clearer and nicer your image will be -- the default value is 50 steps).
+### Manual Inference
+```sh
+python run.py examples/chair.png --output-dir output/
+```
+This will save the reconstructed 3D model to `output/`. You can also specify more than one image path separated by spaces. The default options takes about **6GB VRAM** for a single image input.
 
-Finally, the 64x64 latent image is sent through the decoder to properly render it in high resolution.
+For detailed usage of this script, use `python run.py --help`.
 
-The Stable Diffusion architecture
+### Local Gradio App
+```sh
+python gradio_app.py
+```
 
-All-in-all, it's a pretty simple system -- the Keras implementation fits in four files that represent less than 500 lines of code in total:
+## Troubleshooting
+> AttributeError: module 'torchmcubes_module' has no attribute 'mcubes_cuda'
 
-text_encoder.py: 87 LOC
-diffusion_model.py: 181 LOC
-decoder.py: 86 LOC
-stable_diffusion.py: 106 LOC
-But this relatively simple system starts looking like magic once you train on billions of pictures and their captions. As Feynman said about the universe: "It's not complicated, it's just a lot of it!"
+or
 
-Perks of KerasCV
-With several implementations of Stable Diffusion publicly available why should you use keras_cv.models.StableDiffusion?
+> torchmcubes was not compiled with CUDA support, use CPU version instead.
 
-Aside from the easy-to-use API, KerasCV's Stable Diffusion model comes with some powerful advantages, including:
+This is because `torchmcubes` is compiled without CUDA support. Please make sure that 
 
-Graph mode execution
-XLA compilation through jit_compile=True
-Support for mixed precision computation
-When these are combined, the KerasCV Stable Diffusion model runs orders of magnitude faster than naive implementations. This section shows how to enable all of these features, and the resulting performance gain yielded from using them.
+- The locally-installed CUDA major version matches the PyTorch-shipped CUDA major version. For example if you have CUDA 11.x installed, make sure to install PyTorch compiled with CUDA 11.x.
+- `setuptools>=49.6.0`. If not, upgrade by `pip install --upgrade setuptools`.
 
-For the purposes of comparison, we ran benchmarks comparing the runtime of the HuggingFace diffusers implementation of Stable Diffusion against the KerasCV implementation. Both implementations were tasked to generate 3 images with a step count of 50 for each image. In this benchmark, we used a Tesla T4 GPU.
+Then re-install `torchmcubes` by:
 
-All of our benchmarks are open source on GitHub, and may be re-run on Colab to reproduce the results. The results from the benchmark are displayed in the table below:
+```sh
+pip uninstall torchmcubes
+pip install git+https://github.com/tatsy/torchmcubes.git
+```
 
-GPU	Model	Runtime
-Tesla T4	KerasCV (Warm Start)	28.97s
-Tesla T4	diffusers (Warm Start)	41.33s
-Tesla V100	KerasCV (Warm Start)	12.45
-Tesla V100	diffusers (Warm Start)	12.72
-30% improvement in execution time on the Tesla T4!. While the improvement is much lower on the V100, we generally expect the results of the benchmark to consistently favor the KerasCV across all NVIDIA GPUs.
-
-For the sake of completeness, both cold-start and warm-start generation times are reported. Cold-start execution time includes the one-time cost of model creation and compilation, and is therefore negligible in a production environment (where you would reuse the same model instance many times). Regardless, here are the cold-start numbers:
-
-GPU	Model	Runtime
-Tesla T4	KerasCV (Cold Start)	83.47s
-Tesla T4	diffusers (Cold Start)	46.27s
-Tesla V100	KerasCV (Cold Start)	76.43
-Tesla V100	diffusers (Cold Start)	13.90
-While the runtime results from running this guide may vary, in our testing the KerasCV implementation of Stable Diffusion is significantly faster than its PyTorch counterpart. This may be largely attributed to XLA compilation.
-
-Note: The performance benefits of each optimization can vary significantly between hardware setups.
+## Citation
+```BibTeX
+@article{TripoSR2024,
+  title={TripoSR: Fast 3D Object Reconstruction from a Single Image},
+  author={Tochilkin, Dmitry and Pankratz, David and Liu, Zexiang and Huang, Zixuan and and Letts, Adam and Li, Yangguang and Liang, Ding and Laforte, Christian and Jampani, Varun and Cao, Yan-Pei},
+  journal={arXiv preprint arXiv:2403.02151},
+  year={2024}
+}
+```
